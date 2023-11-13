@@ -1,7 +1,7 @@
 # ecse473_f23_sxw1127_ariac_entry
 ## Build
-`cd <workspace>`
-`catkin_make`
+1. `cd <workspace>`
+2. `catkin_make`
 ## Setup the environment
 `source devel/setup.bash`
 ## Launch the competition environment
