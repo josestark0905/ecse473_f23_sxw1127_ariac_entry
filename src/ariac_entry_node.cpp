@@ -423,7 +423,7 @@ void parse_order(ros::NodeHandle n, const osrf_gear::Order &order, tf2_ros::Buff
                 //pick up
                 //turn on the gripper
                 turn_gripper(true);
-                auto goal_trajectory = find_trajectory_kit(goal_pose.pose, kit_height[product.type], 0.5);
+                auto goal_trajectory = find_trajectory_kit(goal_pose.pose, 0.15, 0.5);
                 print_trajectory(goal_trajectory);
                 action_mode(goal_trajectory, *trajectory_client, false);
                 while(!gripper_check){
