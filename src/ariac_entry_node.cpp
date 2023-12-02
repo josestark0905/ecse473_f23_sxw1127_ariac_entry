@@ -45,6 +45,7 @@ std::map<std::string, double> bin_pos = {
         {"agv1", 2.2},
         {"agv2", -2.2}
 };
+
 //kit heights<name, heights>
 std::map<std::string, double> kit_height = {
 		{"gear_part", 0.015},
@@ -76,9 +77,9 @@ double actuator_position(double position, std::string product_location) {
 		return bin_pos[product_location];
 	}
     double limit = 2.5;
-    double offset = 0.72;//0.75
-    return (position > 0) ? std::min(bin_pos[product_location] + offset + 0.08, limit) : std::max(
-            bin_pos[product_location] - offset + 0.08, -1 * limit);
+    double offset = 0.766;//0.75
+    return (position > 0) ? std::min(bin_pos[product_location] + offset + 0.1, limit) : std::max(
+            bin_pos[product_location] - offset + 0.1, -1 * limit);
 }
 
 //Store the current joint states
@@ -189,6 +190,20 @@ kit_pose find_kit(ros::NodeHandle& n, const std::string& product_type) {
     return kit;
 }
 
+// Get right the agv angles
+int optimal_agv_solution_index(double possible_sol[8][6]){
+	for(int i=0;i<8;i++){
+		ROS_INFO("%f, %f, %f, %f, %f, %f", possible_sol[i][0], possible_sol[i][1], possible_sol[i][2],
+                 possible_sol[i][3], possible_sol[i][4], possible_sol[i][5]);
+	}
+	for(int i=0;i<8;i++){
+		if(possible_sol[i][1] > 3.14 && possible_sol[i][1] < 6.28 && possible_sol[i][3] > 1.57 && possible_sol[i][3] < 4.71){
+			return i;
+		}
+	}
+	return -1;
+}
+
 // Filter out certain angles depending on where it is.
 int optimal_solution_index(double possible_sol[8][6]) {
     for (int i = 0; i < 8; i++) {
@@ -261,7 +276,7 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
         joint_trajectory.points[0].positions[6] = 0.0;
 		joint_trajectory.points[0].positions[0] = joint_states.position[1];
 		// When to start (immediately upon receipt).
-    	joint_trajectory.points[0].time_from_start = ros::Duration(3.0);
+    	joint_trajectory.points[0].time_from_start = ros::Duration(2.0);
     }else{
 		/*for (int indy = 0; indy < joint_trajectory.joint_names.size(); indy++) {
 		    for (int indz = 0; indz < joint_states.name.size(); indz++) {
@@ -280,14 +295,14 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
         joint_trajectory.points[0].positions[6] = 0.0;
 		joint_trajectory.points[0].positions[0] = actuator_position(camera_view.position.y, bin_name);
 		// When to start (immediately upon receipt).
-		double time = std::abs(joint_states.position[1] - joint_trajectory.points[0].positions[0]) / 0.5 + 0.05;
+		double time = std::abs(joint_states.position[1] - joint_trajectory.points[0].positions[0]) / 1.0 + 0.05;
     	joint_trajectory.points[0].time_from_start = ros::Duration(time);
     }
     return joint_trajectory;
 }
 
 //Publish the trajectory messages
-trajectory_msgs::JointTrajectory find_trajectory_kit(const geometry_msgs::Pose& desired, const double height, const double time) {
+trajectory_msgs::JointTrajectory find_trajectory_kit(const geometry_msgs::Pose& desired, const double height, const double time, bool get_kit) {
     // Instantiate variables for use with the kinematic system.
     double T_des[4][4];
     double q_des[8][6];
@@ -314,8 +329,14 @@ trajectory_msgs::JointTrajectory find_trajectory_kit(const geometry_msgs::Pose& 
     int num_sols = ur_kinematics::inverse((double *) &T_des, (double *) &q_des, 0.0);
     // Must select which of the num_sols solutions to use. Just start with the first.
     int q_des_indx = 0;
+    
     // Try to find wrist_2_joint of pi/2 and shoulder_lift_joint under pi/2
-    q_des_indx = optimal_solution_index(q_des);
+    if(get_kit){
+    	q_des_indx = optimal_solution_index(q_des);
+    }else{
+    	q_des_indx = optimal_agv_solution_index(q_des);
+    }
+    
     // Declare a variable for generating and publishing a trajectory.
     trajectory_msgs::JointTrajectory joint_trajectory;
     // Fill out the joint trajectory header.
@@ -381,6 +402,56 @@ void action_mode(trajectory_msgs::JointTrajectory& trajectory, actionlib::Simple
     ros::Duration(0.5).sleep();
 }
 
+void get_kit(kit_pose& kit, tf2_ros::Buffer &tfBuffer){
+	ROS_INFO("---------------kit pose from logical_camera_%s----------------", kit.bin.c_str());
+	print_pose(kit.found_pose);
+	
+	//move the actuator to the correct position
+	auto move_base = find_trajectory(kit.found_pose, kit.bin, false);
+	action_mode(move_base, *trajectory_client, true);
+
+	//get the retrieved pose
+	geometry_msgs::TransformStamped transformStamped = transform(tfBuffer, "arm1_base_link",
+		                                                         "logical_camera_" + kit.bin + "_frame");
+	geometry_msgs::PoseStamped part_pose, goal_pose;
+	
+	// Copy pose from the logical camera.
+	part_pose.pose = kit.found_pose;
+	tf2::doTransform(part_pose, goal_pose, transformStamped);
+	
+	ROS_INFO("---------------kit pose to arm1_base_link----------------");
+	goal_pose.pose.orientation.w = 0.707;
+	goal_pose.pose.orientation.x = 0.0;
+	goal_pose.pose.orientation.y = 0.707;
+	goal_pose.pose.orientation.z = 0.0;
+	print_pose(goal_pose.pose);
+
+	//find the above trajectory
+	auto above_trajectory = find_trajectory_kit(goal_pose.pose, 0.13, 1.5, true);
+	action_mode(above_trajectory, *trajectory_client, true);
+
+	//pick up the kit
+	//turn on the gripper
+	turn_gripper(true);
+	auto goal_trajectory = find_trajectory_kit(goal_pose.pose, 0.015, 0.3, true);
+	print_trajectory(goal_trajectory);
+	action_mode(goal_trajectory, *trajectory_client, false);
+	
+	//if the kit wasn't successfully picked up, try again and again
+	while(!gripper_check){
+	//back to above trajectory
+		auto back_above_trajectory = find_trajectory_kit(goal_pose.pose, 0.13, 0.2, true);
+		action_mode(back_above_trajectory, *trajectory_client, true);
+		goal_trajectory.header.seq = count_joint_trajectory++;
+		goal_trajectory.header.stamp = ros::Time::now();
+		action_mode(goal_trajectory, *trajectory_client, false);
+	}
+
+	//publish_mode(goal_trajectory, trajectory_pub);
+	auto back_pose = find_trajectory(goal_pose.pose, kit.bin, true);
+	action_mode(back_pose, *trajectory_client, true);
+}
+
 //Show the content of the order
 void parse_order(ros::NodeHandle n, const osrf_gear::Order &order, tf2_ros::Buffer &tfBuffer) {
     // The publisher for the trajectory
@@ -396,89 +467,61 @@ void parse_order(ros::NodeHandle n, const osrf_gear::Order &order, tf2_ros::Buff
             ROS_INFO("type: %s", product.type.c_str());
             kit_pose kit = find_kit(n, product.type);
             if (kit.if_found) {
-                ROS_INFO("---------------kit pose from logical_camera_%s----------------", kit.bin.c_str());
-                print_pose(kit.found_pose);
-                //move the actuator to the correct position
-				auto move_base = find_trajectory(kit.found_pose, kit.bin, false);
-                action_mode(move_base, *trajectory_client, true);
+                // the mode of getting certain kit
+                get_kit(kit, tfBuffer);
                 
-                //get the retrieved pose
-                geometry_msgs::TransformStamped transformStamped = transform(tfBuffer, "arm1_base_link",
-                                                                             "logical_camera_" + kit.bin + "_frame");
-                geometry_msgs::PoseStamped part_pose, goal_pose;
-                // Copy pose from the logical camera.
-                part_pose.pose = kit.found_pose;
-                tf2::doTransform(part_pose, goal_pose, transformStamped);
-                ROS_INFO("---------------kit pose to arm1_base_link----------------");
-                goal_pose.pose.orientation.w = 0.707;
-                goal_pose.pose.orientation.x = 0.0;
-                goal_pose.pose.orientation.y = 0.707;
-                goal_pose.pose.orientation.z = 0.0;
-                print_pose(goal_pose.pose);
-                
-                //find the above trajectory
-                auto above_trajectory = find_trajectory_kit(goal_pose.pose, 0.13, 2);
-                action_mode(above_trajectory, *trajectory_client, true);
-                
-                //pick up
-                //turn on the gripper
-                turn_gripper(true);
-                auto goal_trajectory = find_trajectory_kit(goal_pose.pose, 0.015, 0.5);
-                print_trajectory(goal_trajectory);
-                action_mode(goal_trajectory, *trajectory_client, false);
-                while(!gripper_check){
-                //back to above trajectory
-                auto back_above_trajectory = find_trajectory_kit(goal_pose.pose, 0.13, 0.5);
-                action_mode(back_above_trajectory, *trajectory_client, true);
-                goal_trajectory.header.seq = count_joint_trajectory++;
-    			goal_trajectory.header.stamp = ros::Time::now();
-                action_mode(goal_trajectory, *trajectory_client, false);
-				}
-				
-                //publish_mode(goal_trajectory, trajectory_pub);
-                auto back_pose = find_trajectory(goal_pose.pose, kit.bin, true);
-                action_mode(back_pose, *trajectory_client, true);
-                /*
                 // put the part to certain agv
-                std::string agv_name;
+                /*std::string agv_name;
                 if(shipment.agv_id == "any"){
                 	agv_name = "agv1";
                 }else{
                 	agv_name = shipment.agv_id;
                 }
                 //move to agv
-                move_base = find_trajectory(kit.found_pose, agv_name, false);
+                auto move_base = find_trajectory(kit.found_pose, agv_name, false);
+                //move_base.points[0].positions[1] = 1.57;
                 action_mode(move_base, *trajectory_client, true);
                 //get the retrieved pose
-                transformStamped = transform(tfBuffer, "arm1_base_link", "logical_camera_" + agv_name + "_frame");
+                auto transformStamped = transform(tfBuffer, "arm1_base_link", "logical_camera_" + agv_name + "_frame");
                 // Copy pose from the logical camera.
-                part_pose.pose = product.pose;
-                tf2::doTransform(part_pose, goal_pose, transformStamped);
+                geometry_msgs::PoseStamped new_part_pose, new_goal_pose;
+                new_part_pose.pose.position.x = product.pose.position.z;
+                new_part_pose.pose.position.y = product.pose.position.y;
+                new_part_pose.pose.position.z = product.pose.position.x;
+                new_part_pose.pose.orientation = product.pose.orientation;
+               	
+                ROS_INFO("---------------kit pose to %s----------------", agv_name.c_str());
+                print_pose(new_part_pose.pose);
+                tf2::doTransform(new_part_pose, new_goal_pose, transformStamped);
                 ROS_INFO("---------------%s pose to arm1_base_link----------------", agv_name.c_str());
-                goal_pose.pose.orientation.w = 0.707;
-                goal_pose.pose.orientation.x = 0.0;
-                goal_pose.pose.orientation.y = 0.707;
-                goal_pose.pose.orientation.z = 0.0;
-                auto prefix = find_trajectory(goal_pose.pose, kit.bin, true);
-                prefix.points[0].positions[2] = 5;
-                prefix.points[0].positions[3] = 0;
+                double temp = new_goal_pose.pose.position.x;
+                //new_goal_pose.pose.position.x = new_goal_pose.pose.position.z;
+                //new_goal_pose.pose.position.y = new_goal_pose.pose.position.z;
+                //new_goal_pose.pose.position.z = temp;
+                new_goal_pose.pose.orientation.w = 0.707;
+                new_goal_pose.pose.orientation.x = 0.0;
+                new_goal_pose.pose.orientation.y = 0.707;
+                new_goal_pose.pose.orientation.z = 0.0;
+                print_pose(new_goal_pose.pose);
+                auto prefix = find_trajectory_kit(new_goal_pose.pose, -0.3, 2.5, false);
+                prefix.points[0].positions[1] = 2.1;
                 action_mode(prefix, *trajectory_client, true);
-                print_pose(goal_pose.pose);
-                goal_trajectory = find_trajectory_kit(goal_pose.pose, 0.2, 0.5);
-                if (goal_trajectory.points[0].positions[2] > 3.14) {
-					goal_trajectory.points[0].positions[2] -= 6.28;
-				}
-
-				// Prevents excessive turning
-				if (goal_trajectory.points[0].positions[3] > 3.14) {
-					goal_trajectory.points[0].positions[3] -= 6.28;
-				}
+                
+                auto goal_trajectory = find_trajectory_kit(new_goal_pose.pose, -0.3, 2.5, false);
+                
                 print_trajectory(goal_trajectory);
                 action_mode(goal_trajectory, *trajectory_client, true);*/
                 
                 //turn off the gripper
                 turn_gripper(false);
             }
+            /*while(kits_map["agv1"].empty()){
+            		ros::spinOnce();
+            	}
+            	
+            for (const auto &model: kits_map["agv1"]) {
+                print_pose(model.pose);
+            }*/
         }
     }
 }
