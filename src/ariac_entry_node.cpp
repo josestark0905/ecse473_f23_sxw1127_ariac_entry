@@ -73,7 +73,7 @@ geometry_msgs::TransformStamped transform(tf2_ros::Buffer &tfBuffer, std::string
 
 //Get the actuator
 double actuator_position(double position, std::string product_location) {
-	if(product_location == "agv1" || product_location == "agv1"){
+	if(product_location == "agv1" || product_location == "agv2"){
 		return bin_pos[product_location];
 	}
     double limit = 2.5;
@@ -140,7 +140,7 @@ void turn_gripper(bool status){
     srv.request.enable = status;
     
     if(gripper_client.call(srv)) {
-        while(!srv.response.success) {
+        while(!srv.response.success && ros::ok()) {
             gripper_client.call(srv);
         }
         ROS_INFO("VACUUM %s", status ? "ENABLED" : "DISABLED");     
@@ -170,7 +170,7 @@ kit_pose find_kit(ros::NodeHandle& n, const std::string& product_type) {
             ROS_INFO("Found %s in %s!", product_type.c_str(), unit.unit_id.c_str());
             if (unit.unit_id != "belt") {
             	// read the camera again and again
-            	while(kits_map[unit.unit_id].empty()){
+            	while(kits_map[unit.unit_id].empty() && ros::ok()){
             		ros::spinOnce();
             	}
             	
@@ -287,6 +287,7 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
 		        }
 		    }
 		}*/
+		//Actually, repeat this is not necessary, but it makes things more clear, I want to fix the pose of the arm to default pose while moving
 		joint_trajectory.points[0].positions[1] = 3.14;
         joint_trajectory.points[0].positions[2] = 3.14;
         joint_trajectory.points[0].positions[3] = 2.14;
@@ -438,7 +439,7 @@ void get_kit(kit_pose& kit, tf2_ros::Buffer &tfBuffer){
 	action_mode(goal_trajectory, *trajectory_client, false);
 	
 	//if the kit wasn't successfully picked up, try again and again
-	while(!gripper_check){
+	while(!gripper_check && ros::ok()){
 	//back to above trajectory
 		auto back_above_trajectory = find_trajectory_kit(goal_pose.pose, 0.13, 0.2, true);
 		action_mode(back_above_trajectory, *trajectory_client, true);
@@ -452,8 +453,83 @@ void get_kit(kit_pose& kit, tf2_ros::Buffer &tfBuffer){
 	action_mode(back_pose, *trajectory_client, true);
 }
 
+void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& agv_name, const osrf_gear::Product& product){
+	// put the part to certain agv
+	//move to agv
+	auto move_base = find_trajectory(kit.found_pose, agv_name, false);
+	action_mode(move_base, *trajectory_client, true);
+	std::string agv;
+	if(agv_name=="agv1"){
+		agv="kit_tray_1";
+	}else{
+		agv="kit_tray_2";
+	}
+
+	//get the retrieved pose
+	auto transformStamped = transform(tfBuffer, "arm1_base_link", agv);
+	// Copy pose from the logical camera.
+	geometry_msgs::PoseStamped new_part_pose, new_goal_pose;
+	new_part_pose.pose = product.pose;
+
+	ROS_INFO("---------------kit pose to %s----------------", agv.c_str());
+	print_pose(new_part_pose.pose);
+	tf2::doTransform(new_part_pose, new_goal_pose, transformStamped);
+	ROS_INFO("---------------%s pose to arm1_base_link----------------", agv.c_str());
+	new_goal_pose.pose.orientation.w = 0.707;
+	new_goal_pose.pose.orientation.x = 0.0;
+	new_goal_pose.pose.orientation.y = 0.707;
+	new_goal_pose.pose.orientation.z = 0.0;
+	print_pose(new_goal_pose.pose);
+
+	auto prefix = find_trajectory_kit(new_goal_pose.pose, 0.1, 2.5, false);
+	if(agv_name=="agv1"){
+		prefix.points[0].positions[1] = 2.1;
+	}else{
+		prefix.points[0].positions[1] = 4.18;
+	}
+	action_mode(prefix, *trajectory_client, true);
+
+	auto goal_trajectory = find_trajectory_kit(new_goal_pose.pose, 0.1, 1.0, false);
+	print_trajectory(goal_trajectory);
+	action_mode(goal_trajectory, *trajectory_client, true);
+
+
+	//turn off the gripper
+	turn_gripper(false);
+
+	//auto back_pose = find_trajectory(new_goal_pose.pose, kit.bin, true);
+	//action_mode(back_pose, *trajectory_client, true);
+}
+
+//submit shipment
+void submit_shipment(ros::NodeHandle& n, std::string shipment_name, std::string& agv_id) {
+    ros::ServiceClient submit_client;
+    if (agv_id == "agv1") {
+        submit_client = n.serviceClient<osrf_gear::AGVControl>("ariac/agv1");
+    }
+    else if (agv_id == "agv2") {
+        submit_client = n.serviceClient<osrf_gear::AGVControl>("ariac/agv2");
+    }
+    else {
+        ROS_WARN("Invalid AGV ID");
+        return;
+    }
+    osrf_gear::AGVControl submit_srv;
+    submit_srv.request.shipment_type = shipment_name;
+    if (submit_client.call(submit_srv)) {
+        while (!submit_srv.response.success) {
+            submit_client.call(submit_srv);
+        }
+        ROS_INFO("Submitted Shipment %s on %s", shipment_name.c_str(), agv_id.c_str());
+        ROS_INFO("Submission Message : %s", submit_srv.response.message.c_str());
+    }
+    else {
+        ROS_WARN("Could not reach submission service");
+    }
+}
+
 //Show the content of the order
-void parse_order(ros::NodeHandle n, const osrf_gear::Order &order, tf2_ros::Buffer &tfBuffer) {
+void parse_order(ros::NodeHandle& n, const osrf_gear::Order &order, tf2_ros::Buffer &tfBuffer) {
     // The publisher for the trajectory
     ros::Publisher trajectory_pub = n.advertise<trajectory_msgs::JointTrajectory>("/ariac/arm1/arm/command", 10);
     
@@ -462,67 +538,34 @@ void parse_order(ros::NodeHandle n, const osrf_gear::Order &order, tf2_ros::Buff
         std::cout << "---------------------------------------------------------------------" << std::endl;
         ROS_INFO("shipment type: %s", shipment.shipment_type.c_str());
         ROS_INFO("agv_id: %s", shipment.agv_id.c_str());
+        
+        std::string agv_name;
+        if(shipment.agv_id == "any"){
+        	agv_name = "agv1";
+        }else{
+        	agv_name = shipment.agv_id;
+        }
         for (const auto &product: shipment.products) {
             std::cout << "----------------------need the following product---------------------" << std::endl;
             ROS_INFO("type: %s", product.type.c_str());
             kit_pose kit = find_kit(n, product.type);
+            
             if (kit.if_found) {
-                // the mode of getting certain kit
+                //start the mode of getting certain kit
                 get_kit(kit, tfBuffer);
-                
-                // put the part to certain agv
-                /*std::string agv_name;
-                if(shipment.agv_id == "any"){
-                	agv_name = "agv1";
-                }else{
-                	agv_name = shipment.agv_id;
-                }
-                //move to agv
-                auto move_base = find_trajectory(kit.found_pose, agv_name, false);
-                //move_base.points[0].positions[1] = 1.57;
-                action_mode(move_base, *trajectory_client, true);
-                //get the retrieved pose
-                auto transformStamped = transform(tfBuffer, "arm1_base_link", "logical_camera_" + agv_name + "_frame");
-                // Copy pose from the logical camera.
-                geometry_msgs::PoseStamped new_part_pose, new_goal_pose;
-                new_part_pose.pose.position.x = product.pose.position.z;
-                new_part_pose.pose.position.y = product.pose.position.y;
-                new_part_pose.pose.position.z = product.pose.position.x;
-                new_part_pose.pose.orientation = product.pose.orientation;
-               	
-                ROS_INFO("---------------kit pose to %s----------------", agv_name.c_str());
-                print_pose(new_part_pose.pose);
-                tf2::doTransform(new_part_pose, new_goal_pose, transformStamped);
-                ROS_INFO("---------------%s pose to arm1_base_link----------------", agv_name.c_str());
-                double temp = new_goal_pose.pose.position.x;
-                //new_goal_pose.pose.position.x = new_goal_pose.pose.position.z;
-                //new_goal_pose.pose.position.y = new_goal_pose.pose.position.z;
-                //new_goal_pose.pose.position.z = temp;
-                new_goal_pose.pose.orientation.w = 0.707;
-                new_goal_pose.pose.orientation.x = 0.0;
-                new_goal_pose.pose.orientation.y = 0.707;
-                new_goal_pose.pose.orientation.z = 0.0;
-                print_pose(new_goal_pose.pose);
-                auto prefix = find_trajectory_kit(new_goal_pose.pose, -0.3, 2.5, false);
-                prefix.points[0].positions[1] = 2.1;
-                action_mode(prefix, *trajectory_client, true);
-                
-                auto goal_trajectory = find_trajectory_kit(new_goal_pose.pose, -0.3, 2.5, false);
-                
-                print_trajectory(goal_trajectory);
-                action_mode(goal_trajectory, *trajectory_client, true);*/
-                
-                //turn off the gripper
-                turn_gripper(false);
+                //start the mode of putting that kit to the certain kit tray
+                put_kit(kit, tfBuffer, agv_name, product);
             }
-            /*while(kits_map["agv1"].empty()){
+            while(kits_map[agv_name].empty() && ros::ok()){
             		ros::spinOnce();
-            	}
+            }
             	
-            for (const auto &model: kits_map["agv1"]) {
+            for (const auto &model: kits_map[agv_name]) {
                 print_pose(model.pose);
-            }*/
+            }
         }
+        ros::Duration(0.5).sleep();
+        submit_shipment(n, shipment.shipment_type, agv_name);
     }
 }
 
