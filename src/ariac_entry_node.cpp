@@ -61,6 +61,7 @@ geometry_msgs::TransformStamped transform(tf2_ros::Buffer &tfBuffer, std::string
         ROS_INFO("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
     } catch (tf2::TransformException &ex) {
         ROS_ERROR("%s", ex.what());
+        tfStamped = transform(tfBuffer, arm, camera_frame);
     }
     return tfStamped;
 }
@@ -272,15 +273,6 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
 		// When to start (immediately upon receipt).
     	joint_trajectory.points[0].time_from_start = ros::Duration(2.0);
     }else{
-		/*for (int indy = 0; indy < joint_trajectory.joint_names.size(); indy++) {
-		    for (int indz = 0; indz < joint_states.name.size(); indz++) {
-		        if (joint_trajectory.joint_names[indy] == joint_states.name[indz]) {
-		            joint_trajectory.points[0].positions[indy] = joint_states.position[indz];
-		            std::cout<<indy<<" "<< joint_states.position[indz]<<std::endl;
-		            break;
-		        }
-		    }
-		}*/
 		//Actually, repeat this is not necessary, but it makes things more clear, I want to fix the pose of the arm to default pose while moving
 		joint_trajectory.points[0].positions[1] = 3.14;
         joint_trajectory.points[0].positions[2] = 3.14;
@@ -428,7 +420,7 @@ void get_kit(kit_pose& kit, tf2_ros::Buffer &tfBuffer){
 	//pick up the kit
 	//turn on the gripper
 	turn_gripper(true);
-	auto goal_trajectory = find_trajectory_kit(goal_pose.pose, 0.015, 0.3, true);
+	auto goal_trajectory = find_trajectory_kit(goal_pose.pose, 0.018, 0.3, true);
 	print_trajectory(goal_trajectory);
 	action_mode(goal_trajectory, *trajectory_client, false);
 	
@@ -447,13 +439,13 @@ void get_kit(kit_pose& kit, tf2_ros::Buffer &tfBuffer){
 	action_mode(back_pose, *trajectory_client, true);
 }
 
-void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& agv_name, const osrf_gear::Product& product){
+void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& agv_id, const osrf_gear::Product& product){
 	// put the part to certain agv
 	//move to agv
-	auto move_base = find_trajectory(kit.found_pose, agv_name, false);
+	auto move_base = find_trajectory(kit.found_pose, agv_id, false);
 	action_mode(move_base, *trajectory_client, true);
 	std::string agv;
-	if(agv_name=="agv1"){
+	if(agv_id=="agv1"){
 		agv="kit_tray_1";
 	}else{
 		agv="kit_tray_2";
@@ -475,7 +467,7 @@ void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& 
 	print_pose(new_goal_pose.pose);
 
 	auto prefix = find_trajectory_kit(new_goal_pose.pose, 0.1, 2.5, false);
-	if(agv_name=="agv1"){
+	if(agv_id=="agv1"){
 		prefix.points[0].positions[1] = 2.1;
 	}else{
 		prefix.points[0].positions[1] = 4.18;
@@ -530,11 +522,11 @@ void parse_order(ros::NodeHandle& n, const osrf_gear::Order &order, tf2_ros::Buf
         ROS_INFO("shipment type: %s", shipment.shipment_type.c_str());
         ROS_INFO("agv_id: %s", shipment.agv_id.c_str());
         
-        std::string agv_name;
+        std::string agv_id;
         if(shipment.agv_id == "any"){
-        	agv_name = "agv1";
+        	agv_id = "agv1";
         }else{
-        	agv_name = shipment.agv_id;
+        	agv_id = shipment.agv_id;
         }
         for (const auto &product: shipment.products) {
             std::cout << "----------------------need the following product---------------------" << std::endl;
@@ -545,21 +537,21 @@ void parse_order(ros::NodeHandle& n, const osrf_gear::Order &order, tf2_ros::Buf
                 //start the mode of getting certain kit
                 get_kit(kit, tfBuffer);
                 //start the mode of putting that kit to the certain kit tray
-                put_kit(kit, tfBuffer, agv_name, product);
+                put_kit(kit, tfBuffer, agv_id, product);
             }
-            /*while(kits_map[agv_name].empty() && ros::ok()){
+            /*while(kits_map[agv_id].empty() && ros::ok()){
             		ros::spinOnce();
             }
             	
-            for (const auto &model: kits_map[agv_name]) {
+            for (const auto &model: kits_map[agv_id]) {
                 print_pose(model.pose);
             }*/
         }
         ros::Duration(1.0).sleep();
-        for (const auto &model: kits_map[agv_name]) {
+        for (const auto &model: kits_map[agv_id]) {
                 print_pose(model.pose);
         }
-        submit_shipment(n, shipment.shipment_type, agv_name);
+        submit_shipment(n, shipment.shipment_type, agv_id);
     }
 }
 
