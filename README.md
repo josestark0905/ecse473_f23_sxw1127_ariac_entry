@@ -21,6 +21,10 @@ cd ../
 catkin_make
 ```
 
+3. Some other tips
+1) `source /opt/ros/noetic/setup.bash` can be used if your system cannot automatically be a ware of the new installed packs.
+2) The ecse_373_ariac can also be installed in the root environment of ROS with `sudo -- /bin/bash -c` method similar to cwru_ariac_2019. But I don’t recommend this, because after I tried to do this, the permissions of ecse_373_ariac were changed to root permissions, which caused compilation problems.
+
 
 ## Build
 1. `cd <workspace>`
