@@ -1,21 +1,14 @@
 # ecse473_f23_sxw1127_ariac_entry
 ## Prepare for the environment (ROS Noetic)
 1. Create a catkin workspace and build the simulation environment
-`mkdir -p ~/ariac_ws/src`
-
-`cd ~/ariac_ws/src`
-
-
-`git clone https://github.com/cwru-eecs-373/cwru_ariac_2019.git`
-
-
-`rosdep install --from-paths cwru_ariac_2019 --ignore-src -r -y`
+```mkdir -p ~/ariac_ws/src
+cd ~/ariac_ws/src
+git clone https://github.com/cwru-eecs-373/cwru_ariac_2019.git
+rosdep install --from-paths cwru_ariac_2019 --ignore-src -r -y
+cd ../
+sudo -- /bin/bash -c "source /opt/ros/noetic/setup.bash; catkin_make -DCMAKE_INSTALL_PREFIX=/opt/ros/noetic install"```
 
 
-`cd ../`
-
-
-`sudo -- /bin/bash -c "source /opt/ros/noetic/setup.bash; catkin_make -DCMAKE_INSTALL_PREFIX=/opt/ros/noetic install"`
 2. Create another catkin workspace for ecse_373_ariac
 `mkdir -p ~/ecse_373_ariac_ws/src`
 `cd ~/ecse_373_ariac_ws/src`
