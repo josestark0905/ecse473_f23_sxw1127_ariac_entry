@@ -5,14 +5,18 @@
 
 `cd ~/ariac_ws/src`
 
+
 `git clone https://github.com/cwru-eecs-373/cwru_ariac_2019.git`
+
 
 `rosdep install --from-paths cwru_ariac_2019 --ignore-src -r -y`
 
+
 `cd ../`
 
+
 `sudo -- /bin/bash -c "source /opt/ros/noetic/setup.bash; catkin_make -DCMAKE_INSTALL_PREFIX=/opt/ros/noetic install"`
-3. Create another catkin workspace for ecse_373_ariac
+2. Create another catkin workspace for ecse_373_ariac
 `mkdir -p ~/ecse_373_ariac_ws/src`
 `cd ~/ecse_373_ariac_ws/src`
 `git clone https://github.com/cwru-eecs-373/ecse_373_ariac.git`
