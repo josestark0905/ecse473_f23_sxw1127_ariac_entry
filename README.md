@@ -23,15 +23,29 @@ catkin_make
 
 3. Some other tips
 1) `source /opt/ros/noetic/setup.bash` can be used if your system cannot automatically be a ware of the new installed packs.
-2) The ecse_373_ariac can also be installed in the root environment of ROS with `sudo -- /bin/bash -c` method similar to cwru_ariac_2019. But I don’t recommend this, because after I tried to do this, the permissions of ecse_373_ariac were changed to root permissions, which caused compilation problems.
+2) The ecse_373_ariac can also be installed in the root environment of ROS with `sudo -- /bin/bash -c` method similar to cwru_ariac_2019. While I don’t recommend this, since after I tried to do this, the permissions of ecse_373_ariac were changed to root mode, which caused compilation problems.
 
 
 ## Build
-1. `cd <workspace>`
-2. `catkin_make`
-## Setup the environment
-`source devel/setup.bash`
+1. Download this repository to your `<path to your workspace>/src`.
+2. `cd <path to your workspace>`
+3. `source <path to ecse_373_ariac workspace>/devel/setup.bash`
+4. `catkin_make`
+5. `source <path to your workspace>/devel/setup.bash`
+
+
 ## Launch the competition environment
 `roslaunch ecse_373_ariac ecse_373_ariac.launch`
-## Start the client
+
+
+## Start the competition
 `rosrun ariac_entry ariac_entry_node`
+
+
+## Result of the competition
+1. The highest final score
+![Final_score](https://github.com/josestark0905/ecse473_f23_sxw1127_ariac_entry/assets/143913141/055f3feb-ae4d-4030-9e91-6fabaf3bd7c6)
+![order_0_score](https://github.com/josestark0905/ecse473_f23_sxw1127_ariac_entry/assets/143913141/bb4d0775-38f0-4f3b-af0e-354ad3591bc6)
+![order_1_score](https://github.com/josestark0905/ecse473_f23_sxw1127_ariac_entry/assets/143913141/53eb4fcf-e6fe-4e70-a8be-551d98a10fc0)
+
+
