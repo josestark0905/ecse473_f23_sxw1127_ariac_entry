@@ -46,12 +46,6 @@ std::map<std::string, double> bin_pos = {
         {"agv2", -2.2}
 };
 
-//kit heights<name, heights>
-std::map<std::string, double> kit_height = {
-		{"gear_part", 0.015},
-        {"piston_rod_part", 0.015}
-};
-
 //structure of pose of a kit, if_found shows whether the kit is found or not
 struct kit_pose {
     bool if_found;
@@ -63,7 +57,7 @@ struct kit_pose {
 geometry_msgs::TransformStamped transform(tf2_ros::Buffer &tfBuffer, std::string arm, std::string camera_frame) {
     geometry_msgs::TransformStamped tfStamped;
     try {
-        tfStamped = tfBuffer.lookupTransform(arm, camera_frame, ros::Time(0.0), ros::Duration(1.0));
+        tfStamped = tfBuffer.lookupTransform(arm, camera_frame, ros::Time(0.0), ros::Duration(1.5));
         ROS_INFO("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
     } catch (tf2::TransformException &ex) {
         ROS_ERROR("%s", ex.what());
@@ -192,10 +186,10 @@ kit_pose find_kit(ros::NodeHandle& n, const std::string& product_type) {
 
 // Get right the agv angles
 int optimal_agv_solution_index(double possible_sol[8][6]){
-	for(int i=0;i<8;i++){
+	/*for(int i=0;i<8;i++){
 		ROS_INFO("%f, %f, %f, %f, %f, %f", possible_sol[i][0], possible_sol[i][1], possible_sol[i][2],
                  possible_sol[i][3], possible_sol[i][4], possible_sol[i][5]);
-	}
+	}*/
 	for(int i=0;i<8;i++){
 		if(possible_sol[i][1] > 3.14 && possible_sol[i][1] < 6.28 && possible_sol[i][3] > 1.57 && possible_sol[i][3] < 4.71){
 			return i;
@@ -206,10 +200,10 @@ int optimal_agv_solution_index(double possible_sol[8][6]){
 
 // Filter out certain angles depending on where it is.
 int optimal_solution_index(double possible_sol[8][6]) {
-    for (int i = 0; i < 8; i++) {
+    /*for (int i = 0; i < 8; i++) {
         ROS_INFO("%f, %f, %f, %f, %f, %f", possible_sol[i][0], possible_sol[i][1], possible_sol[i][2],
                  possible_sol[i][3], possible_sol[i][4], possible_sol[i][5]);
-    }
+    }*/
     double pi = 3.1415;
     for (int i = 0; i < 8; i++) {
         double shoulder_pan = possible_sol[i][0];
@@ -464,13 +458,12 @@ void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& 
 	}else{
 		agv="kit_tray_2";
 	}
-
 	//get the retrieved pose
-	auto transformStamped = transform(tfBuffer, "arm1_base_link", agv);
+	geometry_msgs::TransformStamped transformStamped = transform(tfBuffer, "arm1_base_link", agv);
 	// Copy pose from the logical camera.
 	geometry_msgs::PoseStamped new_part_pose, new_goal_pose;
 	new_part_pose.pose = product.pose;
-
+	
 	ROS_INFO("---------------kit pose to %s----------------", agv.c_str());
 	print_pose(new_part_pose.pose);
 	tf2::doTransform(new_part_pose, new_goal_pose, transformStamped);
@@ -487,6 +480,7 @@ void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& 
 	}else{
 		prefix.points[0].positions[1] = 4.18;
 	}
+	prefix.points[0].positions[6] = 0.0;
 	action_mode(prefix, *trajectory_client, true);
 
 	auto goal_trajectory = find_trajectory_kit(new_goal_pose.pose, 0.1, 1.0, false);
@@ -496,9 +490,6 @@ void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& 
 
 	//turn off the gripper
 	turn_gripper(false);
-
-	//auto back_pose = find_trajectory(new_goal_pose.pose, kit.bin, true);
-	//action_mode(back_pose, *trajectory_client, true);
 }
 
 //submit shipment
@@ -556,15 +547,18 @@ void parse_order(ros::NodeHandle& n, const osrf_gear::Order &order, tf2_ros::Buf
                 //start the mode of putting that kit to the certain kit tray
                 put_kit(kit, tfBuffer, agv_name, product);
             }
-            while(kits_map[agv_name].empty() && ros::ok()){
+            /*while(kits_map[agv_name].empty() && ros::ok()){
             		ros::spinOnce();
             }
             	
             for (const auto &model: kits_map[agv_name]) {
                 print_pose(model.pose);
-            }
+            }*/
         }
-        ros::Duration(0.5).sleep();
+        ros::Duration(1.0).sleep();
+        for (const auto &model: kits_map[agv_name]) {
+                print_pose(model.pose);
+        }
         submit_shipment(n, shipment.shipment_type, agv_name);
     }
 }
