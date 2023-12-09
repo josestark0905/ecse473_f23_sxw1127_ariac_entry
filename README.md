@@ -41,7 +41,7 @@ catkin_make
 
 ## Launch the competition environment
 1. The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch` (use the python version)
-2. Don't use the C++ environment, since the ariac_entry_node is designed base on the python ariac envrionment, there are some difference between python ariac envrionment and C++ envrionment.
+2. Don't use the C++ ariac environment, since the ariac_entry_node is designed base on the python ariac envrionment, there are some difference between python ariac envrionment and C++ ariac envrionment.
 
 ## Start the competition
 1. `rosrun ariac_entry ariac_entry_node` can start the ariac_entry node and the node will start the competition and try to finish the competition.
