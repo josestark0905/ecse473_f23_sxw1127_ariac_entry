@@ -27,7 +27,7 @@ catkin_make
 ```
 
 3. Some other tips
-1) `source /opt/ros/noetic/setup.bash` can be used if your system cannot automatically be a ware of the new installed packs.
+1) `source /opt/ros/noetic/setup.bash` can be used if your system cannot automatically be aware of the new installed packs.
 2) The ecse_373_ariac can also be installed in the root environment of ROS with `sudo -- /bin/bash -c` method similar to cwru_ariac_2019. While I don’t recommend this, since after I tried to do this, the permissions of ecse_373_ariac were changed to root mode, which caused compilation problems.
 
 
@@ -40,11 +40,13 @@ catkin_make
 
 
 ## Launch the competition environment
-`roslaunch ecse_373_ariac ecse_373_ariac.launch`
+The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch`
 
 
 ## Start the competition
-`rosrun ariac_entry ariac_entry_node`
+1. `rosrun ariac_entry ariac_entry_node` can start the ariac_entry node and the node will start the competition and try to finish the competition.
+2. It takes time for the ariac environment to be prepared for connection. So if it shows failed to connect server, just wait a few seconds and try again.
+3. The lookuptransform function sometimes does't work, which leads to the 0 possible solutions, and it will lead to an error exit. When this occurs, just turn off the environment and rerun it and the node.
 
 
 ## Result of the competition
