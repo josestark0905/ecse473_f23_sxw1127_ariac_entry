@@ -23,7 +23,7 @@
 #include "actionlib/client/terminal_state.h"
 #include "control_msgs/FollowJointTrajectoryAction.h"
 
-// Global count
+// Global value
 int count_joint_trajectory;
 int count_action_goal;
 bool gripper_check;
@@ -170,7 +170,7 @@ kit_pose find_kit(ros::NodeHandle& n, const std::string& product_type) {
             	}
             	
                 for (const auto &model: kits_map[unit.unit_id]) {
-                    ROS_INFO("several model!!!!!!!!!!!!%s", model.type.c_str());
+                    ROS_INFO("several models!!!!!!!!!!!!%s", model.type.c_str());
                     if (model.type == product_type) {
                         kit.if_found = true;
                         kit.bin = unit.unit_id;
@@ -187,10 +187,6 @@ kit_pose find_kit(ros::NodeHandle& n, const std::string& product_type) {
 
 // Get right the agv angles
 int optimal_agv_solution_index(double possible_sol[8][6]){
-	/*for(int i=0;i<8;i++){
-		ROS_INFO("%f, %f, %f, %f, %f, %f", possible_sol[i][0], possible_sol[i][1], possible_sol[i][2],
-                 possible_sol[i][3], possible_sol[i][4], possible_sol[i][5]);
-	}*/
 	for(int i=0;i<8;i++){
 		if(possible_sol[i][1] > 3.14 && possible_sol[i][1] < 6.28 && possible_sol[i][3] > 1.57 && possible_sol[i][3] < 4.71){
 			return i;
@@ -201,10 +197,6 @@ int optimal_agv_solution_index(double possible_sol[8][6]){
 
 // Filter out certain angles depending on where it is.
 int optimal_solution_index(double possible_sol[8][6]) {
-    /*for (int i = 0; i < 8; i++) {
-        ROS_INFO("%f, %f, %f, %f, %f, %f", possible_sol[i][0], possible_sol[i][1], possible_sol[i][2],
-                 possible_sol[i][3], possible_sol[i][4], possible_sol[i][5]);
-    }*/
     double pi = 3.1415;
     for (int i = 0; i < 8; i++) {
         double shoulder_pan = possible_sol[i][0];
@@ -213,27 +205,19 @@ int optimal_solution_index(double possible_sol[8][6]) {
         double wrist1 = possible_sol[i][3];
         double wrist2 = possible_sol[i][4];
         double wrist3 = possible_sol[i][5];
-        bool valid_s = false;
         //shoulder pan
         if (shoulder_pan < pi / 2 || shoulder_pan > 3 * pi / 2) {
-            ROS_INFO("sp1");
             if (shoulder_lift < 3 * pi / 2 && elbow > pi) {
-                ROS_INFO("sp2");
                 if (wrist2 > pi) {
-                    valid_s = true;
+                    return i;
                 }
             }
         } else {
-        	ROS_INFO("sp3");
             if (shoulder_lift > 3 * pi / 2 && elbow < pi) {
-                ROS_INFO("sp4");
                 if (wrist2 > pi) {
-                    valid_s = true;
+                    return i;
                 }
             }
-        }
-        if (valid_s) {
-            return i;
         }
     }
     return -1;
@@ -258,9 +242,8 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
     joint_trajectory.joint_names.emplace_back("wrist_1_joint");
     joint_trajectory.joint_names.emplace_back("wrist_2_joint");
     joint_trajectory.joint_names.emplace_back("wrist_3_joint");
-    // Set a start and end point.
+    // Set the goal point.
     joint_trajectory.points.resize(1);
-    // Set the start point to the current position of the joints from joint_states.
     joint_trajectory.points[0].positions.resize(joint_trajectory.joint_names.size());
     if(default_pose){
         joint_trajectory.points[0].positions[1] = 3.14;
@@ -270,7 +253,7 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
         joint_trajectory.points[0].positions[5] = 3.14;
         joint_trajectory.points[0].positions[6] = 0.0;
 		joint_trajectory.points[0].positions[0] = joint_states.position[1];
-		// When to start (immediately upon receipt).
+		// set the speed
     	joint_trajectory.points[0].time_from_start = ros::Duration(2.0);
     }else{
 		//Actually, repeat this is not necessary, but it makes things more clear, I want to fix the pose of the arm to default pose while moving
@@ -281,7 +264,7 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
         joint_trajectory.points[0].positions[5] = 3.14;
         joint_trajectory.points[0].positions[6] = 0.0;
 		joint_trajectory.points[0].positions[0] = actuator_position(camera_view.position.y, bin_name);
-		// When to start (immediately upon receipt).
+		// set the speed
 		double time = std::abs(joint_states.position[1] - joint_trajectory.points[0].positions[0]) / 1.0 + 0.05;
     	joint_trajectory.points[0].time_from_start = ros::Duration(time);
     }
@@ -314,7 +297,7 @@ trajectory_msgs::JointTrajectory find_trajectory_kit(const geometry_msgs::Pose& 
     T_des[3][1] = 0.0;
     T_des[3][2] = 0.0;
     int num_sols = ur_kinematics::inverse((double *) &T_des, (double *) &q_des, 0.0);
-    // Must select which of the num_sols solutions to use. Just start with the first.
+    // Must select which of the num_sols solutions to use.
     int q_des_indx = 0;
     
     // Try to find wrist_2_joint of pi/2 and shoulder_lift_joint under pi/2
@@ -341,9 +324,8 @@ trajectory_msgs::JointTrajectory find_trajectory_kit(const geometry_msgs::Pose& 
     joint_trajectory.joint_names.emplace_back("wrist_1_joint");
     joint_trajectory.joint_names.emplace_back("wrist_2_joint");
     joint_trajectory.joint_names.emplace_back("wrist_3_joint");
-    // Set a start and end point.
+    // Set the goal point
     joint_trajectory.points.resize(1);
-    // Set the end point for the movement
     joint_trajectory.points[0].positions.resize(joint_trajectory.joint_names.size());
     // The actuators are commanded in an odd order, enter the joint positions in the correct positions
     for (int indy = 0; indy < 6; indy++) {
@@ -389,6 +371,7 @@ void action_mode(trajectory_msgs::JointTrajectory& trajectory, actionlib::Simple
     ros::Duration(0.5).sleep();
 }
 
+// operate the arm to get the kit
 void get_kit(kit_pose& kit, tf2_ros::Buffer &tfBuffer){
 	ROS_INFO("---------------kit pose from logical_camera_%s----------------", kit.bin.c_str());
 	print_pose(kit.found_pose);
@@ -439,6 +422,7 @@ void get_kit(kit_pose& kit, tf2_ros::Buffer &tfBuffer){
 	action_mode(back_pose, *trajectory_client, true);
 }
 
+// operate the arm to put the part on certain agv, put to agv1 if not specified.
 void put_kit(const kit_pose& kit, tf2_ros::Buffer &tfBuffer, const std::string& agv_id, const osrf_gear::Product& product){
 	// put the part to certain agv
 	//move to agv
@@ -511,7 +495,7 @@ void submit_shipment(ros::NodeHandle& n, std::string shipment_name, std::string&
     }
 }
 
-//Show the content of the order
+//Show the content of the order, process the orders
 void parse_order(ros::NodeHandle& n, const osrf_gear::Order &order, tf2_ros::Buffer &tfBuffer) {
     // The publisher for the trajectory
     ros::Publisher trajectory_pub = n.advertise<trajectory_msgs::JointTrajectory>("/ariac/arm1/arm/command", 10);
@@ -539,13 +523,6 @@ void parse_order(ros::NodeHandle& n, const osrf_gear::Order &order, tf2_ros::Buf
                 //start the mode of putting that kit to the certain kit tray
                 put_kit(kit, tfBuffer, agv_id, product);
             }
-            /*while(kits_map[agv_id].empty() && ros::ok()){
-            		ros::spinOnce();
-            }
-            	
-            for (const auto &model: kits_map[agv_id]) {
-                print_pose(model.pose);
-            }*/
         }
         ros::Duration(1.0).sleep();
         for (const auto &model: kits_map[agv_id]) {
