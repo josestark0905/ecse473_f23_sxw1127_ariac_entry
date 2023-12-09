@@ -40,7 +40,7 @@ catkin_make
 
 
 ## Launch the competition environment
-The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch`
+The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch` (use the python version)
 
 
 ## Start the competition
