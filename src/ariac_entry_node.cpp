@@ -39,10 +39,13 @@ std::map <std::string, std::vector<osrf_gear::Model>> kits_map;
 sensor_msgs::JointState joint_states;
 //BIN LOCATIONS <ID, y location>
 std::map<std::string, double> bin_pos = {
-        {"bin4", 0.383},//0.383
-        {"bin5", 1.15},//1.15
-        {"bin6", 1.916},//1.4//1.15
+        {"bin4", 0.383},
+        {"bin5", 1.15},
+        {"bin6", 1.916},
         {"agv1", 2.2},
+        {"bin3", -0.383},
+        {"bin2", -1.15},
+        {"bin1", -1.916},
         {"agv2", -2.2}
 };
 
@@ -297,6 +300,10 @@ trajectory_msgs::JointTrajectory find_trajectory_kit(const geometry_msgs::Pose& 
     T_des[3][1] = 0.0;
     T_des[3][2] = 0.0;
     int num_sols = ur_kinematics::inverse((double *) &T_des, (double *) &q_des, 0.0);
+    if(num_sols <= 0){
+    	ROS_ERROR("EXIT SINCE THE INVERSE FUNCTION DOES NOT WORK. TRY AGAIN!");
+    	exit(1);
+    }
     // Must select which of the num_sols solutions to use.
     int q_des_indx = 0;
     
