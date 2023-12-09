@@ -1,10 +1,9 @@
-# Theory of Operation
+# ecse473_f23_sxw1127_ariac_entry
+## Theory of Operation
 The block diagram shows the theory of operation.
 ![block_diagram](https://github.com/josestark0905/ecse473_f23_sxw1127_ariac_entry/assets/143913141/8334c95f-3d14-4344-b1da-d7e1e1990a1c)
 
 
-
-# ecse473_f23_sxw1127_ariac_entry
 ## Prepare for the environment (ROS Noetic)
 1. Create a catkin workspace and build the simulation environment
 ```
