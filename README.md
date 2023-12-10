@@ -14,6 +14,14 @@ The main logic of operation:
 9. Repeat 3-8 until the required kits in the shipment is all taken to the kit_tray. Submit the shipment and start another shipment, until all shipment in the order is successfully submitted.
 
 
+## Dependency
+The following dependencies should be satisfied:
+- Ubuntu 20.04
+- ROS(Noetic)
+- ARIAC 2019
+- ecse_373_ariac (ARIAC expansino for Noetic)
+
+
 ## Prepare for the environment (ROS Noetic)
 1. Create a catkin workspace and build the simulation environment
 ```
