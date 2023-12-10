@@ -40,8 +40,8 @@ catkin_make
 
 
 ## Launch the competition environment
-1. The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch` (use the python version)
-2. Don't use the C++ ariac environment, since the ariac_entry_node is designed base on the python ariac envrionment, there are some difference between python ariac envrionment and C++ ariac envrionment.
+1. The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch` (use the default version, which equals to "python:=true")
+2. Don't try to use python:=false, since the range of wrist_2_joint in python verison and non-python version are different. The ariac_entry_node is designed based on the python version, so default angle of wrist2 is set to 3.14, which will not work in non-python version
 
 ## Start the competition
 1. `rosrun ariac_entry ariac_entry_node` can start the ariac_entry node and the node will start the competition and try to finish the competition.
