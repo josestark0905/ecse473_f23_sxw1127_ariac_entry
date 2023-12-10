@@ -1,0 +1,42 @@
+<launch>
+    <!-- The Same parameters as ecse_373_ariac -->
+    <arg name="python" default="true" />
+    <arg name="development" default="true" />
+    <arg name="verbose" default="false" />
+    <arg name="state_logging" default="false" />
+    <arg name="no_gui" default="false" />
+    <arg name="fill_demo_shipment" default="false" />
+    <arg name="competition_mode" default="$(optenv ARIAC_COMPETITION false)" />
+    <arg name="world_path" default="$(find ecse_373_ariac)/worlds/gear.world" />
+    <arg name="gear_urdf_xacro" default="$(find ecse_373_ariac)/urdf/gear.urdf.xacro" />
+    <arg name="arm_urdf_dir" default="$(find ecse_373_ariac)/urdf/" />
+    <arg name="trial_file" default="trial_01_config.yaml" />
+    <arg name="trial" default="$(find ecse_373_ariac)/config/$(arg trial_file)" />
+    <arg name="environ_file" default="environment_config.yaml" />
+    <arg name="environ" default="$(find ecse_373_ariac)/config/$(arg environ_file)" />
+    <!-- Set a parameter for ariac_entry_node -->
+    <param if="$(arg python)" name="/use_python" value="true"/>
+    <param unless="$(arg python)" name="/use_python" value="false"/>
+
+    <!-- pass the parameters -->
+    <include file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch">
+        <arg name="python" value="$(arg python)" />
+        <arg name="development" value="$(arg development)" />
+        <arg name="verbose" value="$(arg verbose)" />
+        <arg name="state_logging" value="$(arg state_logging)" />
+        <arg name="no_gui" value="$(arg no_gui)" />
+        <arg name="fill_demo_shipment" value="$(arg fill_demo_shipment)" />
+        <arg name="world_path" value="$(arg world_path)" />
+        <arg name="gear_urdf_xacro" value="$(arg gear_urdf_xacro)" />
+        <arg name="arm_urdf_dir" value="$(arg arm_urdf_dir)" />
+        <arg name="trial" value="$(arg trial)" />
+        <arg name="environ" value="$(arg environ)" />
+    </include>
+
+    <!-- wait for a while -->
+    <group>
+        <param name="use_sim_time" value="true"/>
+        <node pkg="ariac_entry" type="ariac_entry_node" name="ariac_entry_node" output="screen" />
+    </group>
+</launch>
+

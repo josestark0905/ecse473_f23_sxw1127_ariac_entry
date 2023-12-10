@@ -26,6 +26,7 @@
 // Global value
 int count_joint_trajectory;
 int count_action_goal;
+double wrist_2_param;
 bool gripper_check;
 // pointer to action_client
 actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>* trajectory_client;
@@ -253,7 +254,7 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
         joint_trajectory.points[0].positions[2] = 3.14;
         joint_trajectory.points[0].positions[3] = 2.14;
         joint_trajectory.points[0].positions[4] = 3.27;
-        joint_trajectory.points[0].positions[5] = 3.14;
+        joint_trajectory.points[0].positions[5] = wrist_2_param;
         joint_trajectory.points[0].positions[6] = 0.0;
 		joint_trajectory.points[0].positions[0] = joint_states.position[1];
 		// set the speed
@@ -264,7 +265,7 @@ trajectory_msgs::JointTrajectory find_trajectory(const geometry_msgs::Pose& came
         joint_trajectory.points[0].positions[2] = 3.14;
         joint_trajectory.points[0].positions[3] = 2.14;
         joint_trajectory.points[0].positions[4] = 3.27;
-        joint_trajectory.points[0].positions[5] = 3.14;
+        joint_trajectory.points[0].positions[5] = wrist_2_param;
         joint_trajectory.points[0].positions[6] = 0.0;
 		joint_trajectory.points[0].positions[0] = actuator_position(camera_view.position.y, bin_name);
 		// set the speed
@@ -549,6 +550,10 @@ int main(int argc, char **argv) {
 
     //Initialize node handle
     ros::NodeHandle n;
+    
+    //Wait for the ecse_373_ariac
+    ROS_WARN("Wait for the service...");
+    ros::Duration(5.0).sleep();
 
     //Create trigger for the beginning of the competition:
     std_srvs::Trigger begin_comp;
@@ -557,6 +562,11 @@ int main(int argc, char **argv) {
     //Test whether the competition is successfully started
     bool service_call_succeeded;
     service_call_succeeded = begin_client.call(begin_comp);
+    while(!service_call_succeeded && ros::ok()){
+    	ROS_WARN("Try connecting the server! Wait for 3 seconds...");
+    	ros::Duration(3.0).sleep();
+    	service_call_succeeded = begin_client.call(begin_comp);
+    }
     if (service_call_succeeded) {
         if (begin_comp.response.success) {
             //Service was called and competition started successfully
@@ -571,6 +581,22 @@ int main(int argc, char **argv) {
         ros::shutdown();
     }
     
+    //use_python is a param from launch file
+    bool use_python = true;
+
+    if (ros::param::get("/use_python", use_python)) {
+        ROS_INFO("Got python:=%s", use_python ? "true" : "false");
+    } else {
+        ROS_WARN("Failed to get param 'use_python'");
+    }
+
+    if(use_python){
+    	wrist_2_param = 3.14;
+    }else{
+    	wrist_2_param = 0.0;
+    }
+    ROS_WARN("Default wrist_2 is set to %f", wrist_2_param);
+    
     // The action client
     actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> trajectory_action_client("/ariac/arm1/arm/follow_joint_trajectory", true);
     trajectory_action_client.waitForServer();
@@ -578,7 +604,7 @@ int main(int argc, char **argv) {
     trajectory_client = &trajectory_action_client;
 	
 	// start gripper client
-	gripper_client = n.serviceClient<osrf_gear::VacuumGripperControl>("ariac/arm1/gripper/control");
+	gripper_client = n.serviceClient<osrf_gear::VacuumGripperControl>("/ariac/arm1/gripper/control");
 	
     //Subscribe to incoming orders
     order_vector={};
