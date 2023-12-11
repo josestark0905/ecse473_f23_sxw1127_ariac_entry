@@ -59,6 +59,7 @@ catkin_make
 3. `source <path to ecse_373_ariac workspace>/devel/setup.bash`
 4. `catkin_make`
 5. `source <path to your workspace>/devel/setup.bash`
+6. Each time you "source" a "setup.bash", you can use `rospack list` to check whether the pack in that workspace is successflly sourced.
 
 
 ## Start the competition (roslaunch method) [Only works for the "Final" version]
