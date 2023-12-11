@@ -61,11 +61,20 @@ catkin_make
 5. `source <path to your workspace>/devel/setup.bash`
 
 
-## Launch the competition environment
-1. The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch` (use the default version, which equals to "python:=true")
-2. Don't try to use python:=false, since the range of wrist_2_joint in python verison and non-python version are different. The ariac_entry_node is designed based on the python version ariac environment, so default angle of wrist2 is set to 3.14, which will not work in non-python version
+## Start the competition (roslaunch method) [Only works for the "Final" version]
+1. In the latest released tag "Final", it can support using roslaunch to start both "ecse_373_ariac" environment and "ariac_entry_node" with one command `roslaunch ariac_entry competition.launch`
+2. Besides all the argument from "ecse_373_ariac", I added a new parameter for ariac_entry, called "use_python". It's a built_in parameter that adjust the default angel of wrist_2_joint according to python:=true/python:=false.
+3. By default, the argument "python" and the parameter "use_python" are set to true, which means running `roslaunch ariac_entry competition.launch` equals to `roslaunch ariac_entry competition.launch python:=true`. This will start a python version of ariac environment
+4. If you want to use non-python verison, `roslaunch ariac_entry competition.launch python:=false` can be used.
+5. If this roslaunch method doesn't work, you can download the last released tag "phase_4", which is a stable version for rosrun. __Build__ it again and follow the steps in the __"Start the competition (rosrun method)"__
 
-## Start the competition
+
+## Start the competition (rosrun method)
+### Launch the competition environment
+1. The ariac environment can be started by using `roslaunch ecse_373_ariac ecse_373_ariac.launch` (use the default version, which equals to "python:=true")
+2. For this method, __Don't try to use python:=false__, since the range of wrist_2_joint in python verison and non-python version are different. The ariac_entry_node is designed based on the python version ariac environment, so default angle of wrist2 is set to 3.14, which will not work in non-python version
+
+### Start the ariac_entry_node
 1. `rosrun ariac_entry ariac_entry_node` can start the ariac_entry node and the node will start the competition and try to finish the competition.
 2. It takes time for the ariac environment to be prepared for connection. So if it shows failed to connect server, just wait a few seconds and try again.
 3. The lookuptransform function sometimes does't work, which leads to the 0 possible solutions, and it will lead to an error exit. When this occurs, just turn off the environment and rerun it and the node.
